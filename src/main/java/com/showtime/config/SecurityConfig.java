@@ -1,7 +1,8 @@
 package com.showtime.config;
 
+import com.showtime.service.UserDetailsServiceImpl;
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
-
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -15,25 +16,15 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
-import com.showtime.util.AuthEntryPointJwt;
-import com.showtime.util.UserDetailsServiceImpl;
-
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
     
     private final UserDetailsServiceImpl userDetailsService;
     private final AuthEntryPointJwt unauthorizedHandler;
-    private final AuthTokenFilter authTokenFilter;
-    
-    public SecurityConfig(UserDetailsServiceImpl userDetailsService,
-                         AuthEntryPointJwt unauthorizedHandler,
-                         AuthTokenFilter authTokenFilter) {
-        this.userDetailsService = userDetailsService;
-        this.unauthorizedHandler = unauthorizedHandler;
-        this.authTokenFilter = authTokenFilter;
-    }
+    private final AuthTokenFilter authTokenFilter; // This was missing
     
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -60,10 +51,11 @@ public class SecurityConfig {
             .csrf().disable()
             .exceptionHandling().authenticationEntryPoint(unauthorizedHandler).and()
             .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS).and()
-            .authorizeHttpRequests(authz -> authz
+            .authorizeHttpRequests(auth -> auth
                 .requestMatchers("/api/auth/**").permitAll()
-                .requestMatchers("/api/movies/all").permitAll()
-                .requestMatchers("/api/theaters/all").permitAll()
+                .requestMatchers("/api/movies/**").permitAll()
+                .requestMatchers("/api/theaters/**").permitAll()
+                .requestMatchers("/api/shows/**").permitAll()
                 .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 .anyRequest().authenticated()

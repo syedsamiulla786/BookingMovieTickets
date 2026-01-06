@@ -117,12 +117,7 @@
     <groupId>org.springframework.boot</groupId>
     <artifactId>spring-boot-starter-thymeleaf</artifactId>
 </dependency>
-<!-- Razorpay Payment Gateway -->
-<dependency>
-    <groupId>com.razorpay</groupId>
-    <artifactId>razorpay-java</artifactId>
-    <version>1.4.4</version>
-</dependency>
+
 
 <!-- JSON Processing -->
 <dependency>

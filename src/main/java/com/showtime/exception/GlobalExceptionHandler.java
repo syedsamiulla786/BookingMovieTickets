@@ -71,13 +71,7 @@ public class GlobalExceptionHandler {
             errors.put(fieldName, errorMessage);
         });
         
-        ApiResponse response = new ApiResponse(
-            false,
-            "Validation failed",
-            LocalDateTime.now(),
-            request.getDescription(false),
-            errors
-        );
+        ApiResponse response = new ApiResponse(false,"Validation failed",LocalDateTime.now(),request.getDescription(false));
         
         return new ResponseEntity<>(response, HttpStatus.BAD_REQUEST);
     }

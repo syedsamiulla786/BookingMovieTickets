@@ -40,7 +40,7 @@ public class Movie {
     
     private String genre;
     
-    @Column(precision = 3, scale = 1)
+    // FIX HERE: Remove precision/scale for Double
     private Double rating = 0.0;
     
     @Column(name = "release_date")

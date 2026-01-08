@@ -11,6 +11,8 @@ import java.io.IOException;
 import java.util.HashMap;
 import java.util.Map;
 
+import com.fasterxml.jackson.databind.ObjectMapper; // ADD THIS IMPORT
+
 @Component
 public class AuthEntryPointJwt implements AuthenticationEntryPoint {
 
@@ -24,13 +26,11 @@ public class AuthEntryPointJwt implements AuthenticationEntryPoint {
         Map<String, Object> body = new HashMap<>();
         body.put("status", HttpServletResponse.SC_UNAUTHORIZED);
         body.put("error", "Unauthorized");
-        body.put("message", authException.getMessage());
+        body.put("message", "Full authentication is required to access this resource");
         body.put("path", request.getServletPath());
         
-        response.getWriter().write(convertObjectToJson(body));
-    }
-    
-    private String convertObjectToJson(Object object) throws IOException {
-        return new com.fasterxml.jackson.databind.ObjectMapper().writeValueAsString(object);
+        // Use ObjectMapper directly
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.writeValue(response.getOutputStream(), body);
     }
 }

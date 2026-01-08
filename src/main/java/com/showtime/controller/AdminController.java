@@ -1,79 +1,110 @@
 package com.showtime.controller;
 
 import com.showtime.dto.*;
-import com.showtime.service.*;
+import com.showtime.dto.request.*;
+import com.showtime.dto.response.AuthResponse;
+import com.showtime.model.User;
+import com.showtime.repository.UserRepository;
+import com.showtime.service.AuthService;
+import com.showtime.service.EmailService;
+import com.showtime.util.JwtUtils;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDateTime;
-import java.util.List;
+import java.util.HashMap;
 import java.util.Map;
 
+@CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
 @RequestMapping("/api/admin")
-@PreAuthorize("hasRole('ADMIN')")
 @RequiredArgsConstructor
 public class AdminController {
     
-    private final UserService userService;
-    private final MovieService movieService;
-    private final TheaterService theaterService;
-    private final ShowService showService;
-    private final BookingService bookingService;
+    private final AuthenticationManager authenticationManager;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtUtils jwtUtils;
+    private final AuthService authService;
+    private final EmailService emailService;
     
-    @GetMapping("/dashboard/stats")
-    public ResponseEntity<DashboardStatsDTO> getDashboardStats() {
-        DashboardStatsDTO stats = new DashboardStatsDTO();
-        stats.setTotalBookings(bookingService.getTotalBookings());
-        stats.setTotalMovies(movieService.getTotalMovies());
-        stats.setTotalTheaters(theaterService.getTotalTheaters());
-        stats.setTotalUsers(userService.getTotalUsers());
-        stats.setTotalRevenue(bookingService.getTotalRevenue());
+    @PostMapping("/signup")
+    public ResponseEntity<?> registerUser(@Valid @RequestBody RegisterRequest request) {
+        // Check if user already exists
+        if (userRepository.existsByEmail(request.getEmail())) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("message", "Error: Email is already registered!"));
+        }
         
-        // Get monthly revenue for last 6 months
-        LocalDateTime sixMonthsAgo = LocalDateTime.now().minusMonths(6);
-        List<Object[]> revenueData = List.of(); // bookingService.getMonthlyRevenue(sixMonthsAgo);
+        // Create new user
+        User user = new User();
+        user.setName(request.getName());
+        user.setEmail(request.getEmail());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setPhone(request.getPhone());
+        user.setRole(User.Role.USER);
         
-        List<RevenueChartDTO> revenueChart = revenueData.stream()
-            .map(data -> {
-                RevenueChartDTO chart = new RevenueChartDTO();
-                chart.setMonth((String) data[0]);
-                chart.setRevenue((Double) data[1]);
-                return chart;
-            })
-            .toList();
+        userRepository.save(user);
         
-        stats.setRevenueChart(revenueChart);
-        return ResponseEntity.ok(stats);
+        // Send welcome email
+        emailService.sendWelcomeEmail(user.getEmail(), user.getName());
+        
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "message", "User registered successfully!"
+        ));
     }
     
-    @GetMapping("/users")
-    public ResponseEntity<List<UserDTO>> getAllUsers() {
-        return ResponseEntity.ok(userService.getAllUsers());
+    @PostMapping("/login")
+    public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest request) {
+        try {
+            Authentication authentication = authenticationManager.authenticate(
+                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+            );
+            
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+            String jwt = jwtUtils.generateJwtToken(authentication);
+            
+            User user = (User) authentication.getPrincipal();
+            AuthResponse response = new AuthResponse(
+                jwt, 
+                user.getId(), 
+                user.getName(), 
+                user.getEmail(), 
+                user.getPhone(), 
+                user.getRole().name()
+            );
+            
+            return ResponseEntity.ok(response);
+            
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                .body(Map.of("message", "Invalid email or password"));
+        }
     }
     
-    @PutMapping("/users/{id}/role")
-    public ResponseEntity<UserDTO> updateUserRole(
-            @PathVariable Long id,
-            @RequestBody Map<String, String> request) {
-        return ResponseEntity.ok(userService.updateUserRole(id, request.get("role")));
+    @PostMapping("/logout")
+    public ResponseEntity<?> logoutUser() {
+        SecurityContextHolder.clearContext();
+        return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
     
-    @GetMapping("/reports/bookings")
-    public ResponseEntity<List<BookingDTO>> getBookingReports(
-            @RequestParam(required = false) String startDate,
-            @RequestParam(required = false) String endDate) {
-        // Implementation for booking reports
-        return ResponseEntity.ok(List.of());
+    // Add these endpoints if needed
+    @PostMapping("/refresh-token")
+    public ResponseEntity<?> refreshToken(@RequestHeader("Authorization") String authHeader) {
+        // Implementation for token refresh
+        return ResponseEntity.ok().build();
     }
     
-    @GetMapping("/reports/revenue")
-    public ResponseEntity<Map<String, Object>> getRevenueReports(
-            @RequestParam(required = false) String startDate,
-            @RequestParam(required = false) String endDate) {
-        // Implementation for revenue reports
-        return ResponseEntity.ok(Map.of());
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        authService.forgotPassword(request.getEmail());
+        return ResponseEntity.ok(Map.of("message", "Password reset link sent to your email"));
     }
 }

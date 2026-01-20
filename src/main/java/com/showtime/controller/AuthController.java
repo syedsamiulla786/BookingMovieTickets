@@ -11,10 +11,13 @@ import com.showtime.util.JwtUtils;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
 
@@ -36,27 +39,49 @@ public class AuthController {
     
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
-    	System.out.println("Login object -> "+request);
+        System.out.println("Login attempt for email: " + request.getEmail());
+        
         try {
+            System.out.println("Attempting authentication...");
             Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
             );
             
+            System.out.println("Authentication successful!");
             SecurityContextHolder.getContext().setAuthentication(authentication);
             String jwt = jwtUtils.generateJwtToken(authentication);
-            System.out.println("Token "+ jwt);
+            System.out.println("Token generated: " + jwt);
             
-            User user = (User) authentication.getPrincipal();
+            UserDetails userDetails =
+                    (UserDetails) authentication.getPrincipal();
+            
+            User user = userRepository
+                    .findByEmail(userDetails.getUsername())
+                    .orElseThrow();
+            System.out.println("User found: " + user.getEmail() + ", Role: " + user.getRole());
+            
             AuthResponse response = new AuthResponse(
-                jwt, user.getId(), user.getName(), 
-                user.getEmail(), user.getPhone(), user.getRole().name()
-            );
+            	    jwt,
+            	    user.getId(),
+            	    user.getName(),
+            	    user.getEmail(),
+            	    user.getPhone(),
+            	    user.getRole().name()  
+            	);
+
             
             return ResponseEntity.ok(response);
             
-        } catch (Exception e) {
+        } catch (BadCredentialsException e) {
+            System.out.println("BadCredentialsException: " + e.getMessage());
             return ResponseEntity.badRequest()
                 .body(Map.of("message", "Invalid email or password"));
+        } catch (Exception e) {
+            System.out.println("General Exception during login: " + e.getClass().getName());
+            System.out.println("Exception message: " + e.getMessage());
+            e.printStackTrace();  // This will show the full stack trace
+            return ResponseEntity.badRequest()
+                .body(Map.of("message", "Login failed: " + e.getMessage()));
         }
     }
     
@@ -72,7 +97,7 @@ public class AuthController {
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setPhone(request.getPhone());
-        user.setRole(User.Role.USER);
+        user.setRole(User.Role.ADMIN);
         
         userRepository.save(user);
         
@@ -83,12 +108,14 @@ public class AuthController {
     }
     
     @PostMapping("/logout")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('THEATER_OWNER')")
     public ResponseEntity<?> logout() {
         SecurityContextHolder.clearContext();
         return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
     }
     
     @PostMapping("/refresh-token")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('THEATER_OWNER')")
     public ResponseEntity<?> refreshToken(@RequestHeader("Authorization") String authHeader) {
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             String token = authHeader.substring(7);

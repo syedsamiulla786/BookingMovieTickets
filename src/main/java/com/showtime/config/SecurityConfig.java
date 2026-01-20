@@ -130,7 +130,7 @@ public class SecurityConfig {
                 .requestMatchers("/v3/api-docs/**").permitAll()
                 
                 // Admin
-                .requestMatchers("/api/admin/**").hasRole("ADMIN")
+//                .requestMatchers("/api/admin/**").hasRole("ADMIN")
                 
                 // All other
                 .anyRequest().authenticated()

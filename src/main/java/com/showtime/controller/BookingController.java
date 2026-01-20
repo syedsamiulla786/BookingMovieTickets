@@ -6,6 +6,7 @@ import com.showtime.model.User;
 import com.showtime.service.BookingService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import com.showtime.dto.request.*;
@@ -22,6 +23,7 @@ public class BookingController {
     private final BookingService bookingService;
     
     @PostMapping
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<BookingResponse> createBooking(
             @RequestBody BookingRequest request,
             @AuthenticationPrincipal User user) {
@@ -29,16 +31,19 @@ public class BookingController {
     }
     
     @GetMapping("/my-bookings")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<List<BookingDTO>> getMyBookings(@AuthenticationPrincipal User user) {
         return ResponseEntity.ok(bookingService.getUserBookings(user.getId()));
     }
     
     @GetMapping("/my-bookings/history")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<BookingHistoryDTO> getMyBookingHistory(@AuthenticationPrincipal User user) {
         return ResponseEntity.ok(bookingService.getUserBookingHistory(user.getId()));
     }
     
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<BookingDTO> getBookingById(@PathVariable Long id, @AuthenticationPrincipal User user) {
         List<BookingDTO> bookings = bookingService.getUserBookings(user.getId());
         BookingDTO booking = bookings.stream()
@@ -58,6 +63,7 @@ public class BookingController {
     }
     
     @GetMapping("/{id}/tickets")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<List<TicketDTO>> getBookingTickets(@PathVariable Long id) {
         // Implementation for getting tickets
         return ResponseEntity.ok(List.of());

@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import java.util.Map;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -19,21 +20,25 @@ public class PaymentController {
     private final PaymentService paymentService;
     
     @PostMapping("/initiate")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<PaymentResponse> initiatePayment(@RequestBody PaymentRequest request) {
         return ResponseEntity.ok(paymentService.initiatePayment(request));
     }
     
     @PostMapping("/verify")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<PaymentDTO> verifyPayment(@RequestBody PaymentVerificationRequest request) {
         return ResponseEntity.ok(paymentService.verifyPayment(request));
     }
     
     @GetMapping("/{id}")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<PaymentDTO> getPaymentDetails(@PathVariable Long id) {
         return ResponseEntity.ok(paymentService.getPaymentDetails(id));
     }
     
     @PostMapping("/{id}/refund")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<PaymentDTO> processRefund(
             @PathVariable Long id,
             @RequestBody Map<String, String> request) {

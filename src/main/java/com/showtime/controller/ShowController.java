@@ -41,6 +41,7 @@ public class ShowController {
     }
     
     @GetMapping("/{showId}/seats")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     public ResponseEntity<SeatLayoutResponse> getSeatLayout(@PathVariable Long showId) {
         return ResponseEntity.ok(showService.getSeatLayout(showId));
     }
@@ -52,6 +53,7 @@ public class ShowController {
     }
     
     @PostMapping("/{showId}/book-seats")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     public ResponseEntity<?> bookSeats(
             @PathVariable Long showId,
             @RequestBody SeatSelectionRequest request) {

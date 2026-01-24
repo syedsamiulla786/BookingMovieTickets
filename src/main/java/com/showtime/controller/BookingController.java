@@ -2,16 +2,24 @@ package com.showtime.controller;
 
 
 import com.showtime.dto.*;
+import com.showtime.model.Booking;
 import com.showtime.model.User;
+import com.showtime.repository.BookingRepository;
+import com.showtime.repository.UserRepository;
 import com.showtime.service.BookingService;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 import com.showtime.dto.request.*;
 import com.showtime.dto.response.*;
+import com.showtime.exception.ResourceNotFoundException;
 
+import java.nio.file.AccessDeniedException;
 import java.util.List;
 import java.util.Map;
 
@@ -19,21 +27,30 @@ import java.util.Map;
 @RequestMapping("/api/bookings")
 @RequiredArgsConstructor
 public class BookingController {
-    
+    @Autowired
     private final BookingService bookingService;
+    @Autowired
+    private final BookingRepository bookingRepository;
+    @Autowired
+    private final UserRepository userRepository;
     
     @PostMapping
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<BookingResponse> createBooking(
             @RequestBody BookingRequest request,
-            @AuthenticationPrincipal User user) {
+            @AuthenticationPrincipal UserDetails userDetails) { // Changed from User to UserDetails
+        
+        // Get the user entity from the repository
+        User user = userRepository.findByEmail(userDetails.getUsername())
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        
         return ResponseEntity.ok(bookingService.createBooking(request, user));
     }
     
     @GetMapping("/my-bookings")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<List<BookingDTO>> getMyBookings(@AuthenticationPrincipal User user) {
-        return ResponseEntity.ok(bookingService.getUserBookings(user.getId()));
+    public ResponseEntity<List<BookingDTO>> getMyBookings(@AuthenticationPrincipal org.springframework.security.core.userdetails.User user) {
+        return ResponseEntity.ok(bookingService.getUserBookings(user.getUsername()));
     }
     
     @GetMapping("/my-bookings/history")
@@ -42,15 +59,33 @@ public class BookingController {
         return ResponseEntity.ok(bookingService.getUserBookingHistory(user.getId()));
     }
     
+//    @GetMapping("/{id}")
+//    @PreAuthorize("hasRole('USER')")
+//    public ResponseEntity<BookingDTO> getBookingById(@PathVariable Long id, @AuthenticationPrincipal User user) {
+//        List<BookingDTO> bookings = bookingService.getUserBookings(user.getEmail());
+//        BookingDTO booking = bookings.stream()
+//            .filter(b -> b.getId().equals(id))
+//            .findFirst()
+//            .orElseThrow(() -> new RuntimeException("Booking not found"));
+//        return ResponseEntity.ok(booking);
+//    }
+////    
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<BookingDTO> getBookingById(@PathVariable Long id, @AuthenticationPrincipal User user) {
-        List<BookingDTO> bookings = bookingService.getUserBookings(user.getId());
-        BookingDTO booking = bookings.stream()
-            .filter(b -> b.getId().equals(id))
-            .findFirst()
-            .orElseThrow(() -> new RuntimeException("Booking not found"));
-        return ResponseEntity.ok(booking);
+    public ResponseEntity<BookingDTO> getBookingById(
+            @PathVariable Long id,
+            @AuthenticationPrincipal User user) throws AccessDeniedException {
+        
+        // Check if booking belongs to user
+        Booking booking = bookingRepository.findById(id)
+            .orElseThrow(() -> new ResourceNotFoundException("Booking", "id", id));
+        
+        if (!booking.getUser().getId().equals(user.getId()) && 
+            !user.getRole().equals(User.Role.ADMIN)) {
+            throw new AccessDeniedException("You don't have permission to view this booking");
+        }
+        
+        return ResponseEntity.ok(bookingService.convertToDTO(booking) );
     }
     
     @PostMapping("/{id}/cancel")
@@ -68,4 +103,6 @@ public class BookingController {
         // Implementation for getting tickets
         return ResponseEntity.ok(List.of());
     }
+    
+    
 }

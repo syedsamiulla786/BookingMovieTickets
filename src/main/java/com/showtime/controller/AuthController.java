@@ -50,6 +50,7 @@ public class AuthController {
             System.out.println("Authentication successful!");
             SecurityContextHolder.getContext().setAuthentication(authentication);
             String jwt = jwtUtils.generateJwtToken(authentication);
+//            jwt+=jwt.substring(0,21)+"rsr"+jwt.substring(21);
             System.out.println("Token generated: " + jwt);
             
             UserDetails userDetails =
@@ -87,6 +88,8 @@ public class AuthController {
     
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
+    	
+    	System.out.println("Registration : "+request);
         if (userRepository.existsByEmail(request.getEmail())) {
             return ResponseEntity.badRequest()
                 .body(Map.of("message", "Email is already registered"));
@@ -97,7 +100,7 @@ public class AuthController {
         user.setEmail(request.getEmail());
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setPhone(request.getPhone());
-        user.setRole(User.Role.ADMIN);
+        user.setRole(User.Role.USER);
         
         userRepository.save(user);
         

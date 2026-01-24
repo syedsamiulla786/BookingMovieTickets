@@ -1,110 +1,136 @@
 package com.showtime.controller;
 
 import com.showtime.dto.*;
-import com.showtime.dto.request.*;
-import com.showtime.dto.response.AuthResponse;
-import com.showtime.model.User;
-import com.showtime.repository.UserRepository;
-import com.showtime.service.AuthService;
-import com.showtime.service.EmailService;
-import com.showtime.util.JwtUtils;
-import jakarta.validation.Valid;
+import com.showtime.service.*;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
-@CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
 @RequestMapping("/api/admin")
+@PreAuthorize("hasRole('ADMIN')")
 @RequiredArgsConstructor
 public class AdminController {
     
-    private final AuthenticationManager authenticationManager;
-    private final UserRepository userRepository;
-    private final PasswordEncoder passwordEncoder;
-    private final JwtUtils jwtUtils;
-    private final AuthService authService;
-    private final EmailService emailService;
+    private final UserService userService;
+    private final MovieService movieService;
+    private final TheaterService theaterService;
+    private final ShowService showService;
+    private final BookingService bookingService;
     
-    @PostMapping("/signup")
-    public ResponseEntity<?> registerUser(@Valid @RequestBody RegisterRequest request) {
-        // Check if user already exists
-        if (userRepository.existsByEmail(request.getEmail())) {
-            return ResponseEntity.badRequest()
-                .body(Map.of("message", "Error: Email is already registered!"));
-        }
+    @GetMapping("/dashboard/stats")
+    public ResponseEntity<DashboardStatsDTO> getDashboardStats() {
+        DashboardStatsDTO stats = new DashboardStatsDTO();
+        stats.setTotalBookings(bookingService.getTotalBookings());
+        stats.setTotalMovies(movieService.getTotalMovies());
+        stats.setTotalTheaters(theaterService.getTotalTheaters());
+        stats.setTotalUsers(userService.getTotalUsers());
+        stats.setTotalRevenue(bookingService.getTotalRevenue());
         
-        // Create new user
-        User user = new User();
-        user.setName(request.getName());
-        user.setEmail(request.getEmail());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setPhone(request.getPhone());
-        user.setRole(User.Role.USER);
+        // Convert Object[] to RevenueChartDTO
+        List<RevenueChartDTO> revenueChart = bookingService.getMonthlyRevenue().stream()
+            .map(data -> {
+                RevenueChartDTO dto = new RevenueChartDTO();
+                dto.setMonth((String) data[0]);
+                dto.setRevenue((Double) data[1]);
+                return dto;
+            })
+            .collect(Collectors.toList());
         
-        userRepository.save(user);
-        
-        // Send welcome email
-        emailService.sendWelcomeEmail(user.getEmail(), user.getName());
-        
-        return ResponseEntity.ok(Map.of(
-            "success", true,
-            "message", "User registered successfully!"
-        ));
+        stats.setRevenueChart(revenueChart);
+        return ResponseEntity.ok(stats);
     }
     
-    @PostMapping("/login")
-    public ResponseEntity<?> authenticateUser(@Valid @RequestBody LoginRequest request) {
-        try {
-            Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
-            );
-            
-            SecurityContextHolder.getContext().setAuthentication(authentication);
-            String jwt = jwtUtils.generateJwtToken(authentication);
-            
-            User user = (User) authentication.getPrincipal();
-            AuthResponse response = new AuthResponse(
-                jwt, 
-                user.getId(), 
-                user.getName(), 
-                user.getEmail(), 
-                user.getPhone(), 
-                user.getRole().name()
-            );
-            
-            return ResponseEntity.ok(response);
-            
-        } catch (Exception e) {
-            return ResponseEntity.badRequest()
-                .body(Map.of("message", "Invalid email or password"));
-        }
+    // USER MANAGEMENT ENDPOINTS
+    @GetMapping("/users")
+    public ResponseEntity<List<UserDTO>> getAllUsers() {
+        return ResponseEntity.ok(userService.getAllUsers());
     }
     
-    @PostMapping("/logout")
-    public ResponseEntity<?> logoutUser() {
-        SecurityContextHolder.clearContext();
-        return ResponseEntity.ok(Map.of("message", "Logged out successfully"));
+    @PutMapping("/users/{id}/role")
+    public ResponseEntity<UserDTO> updateUserRole(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> request) {
+        return ResponseEntity.ok(userService.updateUserRole(id, request.get("role")));
     }
     
-    // Add these endpoints if needed
-    @PostMapping("/refresh-token")
-    public ResponseEntity<?> refreshToken(@RequestHeader("Authorization") String authHeader) {
-        // Implementation for token refresh
-        return ResponseEntity.ok().build();
+    @GetMapping("/users/search")
+    public ResponseEntity<List<UserDTO>> searchUsers(@RequestParam String query) {
+        return ResponseEntity.ok(userService.searchUsers(query));
     }
     
-    @PostMapping("/forgot-password")
-    public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
-        authService.forgotPassword(request.getEmail());
-        return ResponseEntity.ok(Map.of("message", "Password reset link sent to your email"));
+    // MOVIE MANAGEMENT ENDPOINTS
+    @GetMapping("/movies/analytics")
+    public ResponseEntity<Map<String, Object>> getMovieAnalytics() {
+        Map<String, Object> analytics = Map.of(
+            "totalMovies", movieService.getTotalMovies(),
+            "activeMovies", movieService.getActiveMoviesCount(),
+            "upcomingMovies", movieService.getUpcomingMoviesCount()
+        );
+        return ResponseEntity.ok(analytics);
+    }
+    
+    // THEATER MANAGEMENT ENDPOINTS
+    @GetMapping("/theaters/analytics")
+    public ResponseEntity<Map<String, Object>> getTheaterAnalytics() {
+        Map<String, Object> analytics = Map.of(
+            "totalTheaters", theaterService.getTotalTheaters(),
+            "cities", theaterService.getAllCities(),
+            "activeTheaters", theaterService.getActiveTheatersCount()
+        );
+        return ResponseEntity.ok(analytics);
+    }
+    
+//    // BOOKING MANAGEMENT ENDPOINTS
+//    @GetMapping("/bookings")
+//    public ResponseEntity<List<BookingDTO>> getAllBookings(
+//            @RequestParam(defaultValue = "0") int page,
+//            @RequestParam(defaultValue = "10") int size) {
+//        return ResponseEntity.ok(bookingService.getAllBookings(page, size));
+//    }
+    
+    @GetMapping("/bookings/revenue")
+    public ResponseEntity<Map<String, Object>> getRevenueReport(
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
+        Map<String, Object> report = Map.of(
+            "totalRevenue", bookingService.getTotalRevenue(),
+            "monthlyRevenue", bookingService.getMonthlyRevenue(),
+            "todaysBookings", bookingService.getTodaysBookingsCount()
+        );
+        return ResponseEntity.ok(report);
+    }
+    
+    @PutMapping("/bookings/{id}/status")
+    public ResponseEntity<?> updateBookingStatus(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> request) {
+        bookingService.updateBookingStatus(id, request.get("status"));
+        return ResponseEntity.ok(Map.of("message", "Booking status updated"));
+    }
+    
+    // SYSTEM ENDPOINTS
+    @GetMapping("/system/health")
+    public ResponseEntity<Map<String, Object>> getSystemHealth() {
+        Map<String, Object> health = Map.of(
+            "status", "UP",
+            "timestamp", LocalDateTime.now(),
+            "database", "CONNECTED",
+            "memoryUsage", Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()
+        );
+        return ResponseEntity.ok(health);
+    }
+    
+    @PostMapping("/system/cache/clear")
+    public ResponseEntity<?> clearCache() {
+        // Implement cache clearing logic
+        return ResponseEntity.ok(Map.of("message", "Cache cleared successfully"));
     }
 }

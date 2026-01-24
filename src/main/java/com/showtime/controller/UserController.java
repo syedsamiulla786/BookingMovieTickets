@@ -1,8 +1,8 @@
 package com.showtime.controller;
 
 import com.showtime.dto.*;
-import com.showtime.dto.request.*;
-import com.showtime.dto.response.*;
+import com.showtime.dto.request.ChangePasswordRequest;
+import com.showtime.dto.request.ProfileUpdateRequest;
 import com.showtime.model.User;
 import com.showtime.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -28,7 +28,7 @@ public class UserController {
     }
     
     @PutMapping("/profile")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('THEATER_OWNER')")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     public ResponseEntity<UserDTO> updateProfile(
             @RequestBody ProfileUpdateRequest request,
             @AuthenticationPrincipal User user) {
@@ -47,8 +47,7 @@ public class UserController {
     @GetMapping("/wishlist")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<List<MovieDTO>> getWishlist(@AuthenticationPrincipal User user) {
-        // Implementation for wishlist
-        return ResponseEntity.ok(List.of());
+        return ResponseEntity.ok(userService.getWishlist(user));
     }
     
     @PostMapping("/wishlist/{movieId}")
@@ -56,6 +55,7 @@ public class UserController {
     public ResponseEntity<?> addToWishlist(
             @PathVariable Long movieId,
             @AuthenticationPrincipal User user) {
+        userService.addToWishlist(user, movieId);
         return ResponseEntity.ok(Map.of("message", "Added to wishlist"));
     }
     
@@ -64,6 +64,26 @@ public class UserController {
     public ResponseEntity<?> removeFromWishlist(
             @PathVariable Long movieId,
             @AuthenticationPrincipal User user) {
+        userService.removeFromWishlist(user, movieId);
         return ResponseEntity.ok(Map.of("message", "Removed from wishlist"));
+    }
+    
+    @GetMapping("/bookings")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('THEATER_OWNER')")
+    public ResponseEntity<List<BookingDTO>> getUserBookings(@AuthenticationPrincipal User user) {
+        return ResponseEntity.ok(userService.getUserBookings(user));
+    }
+    
+    @DeleteMapping("/profile")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN') or hasRole('THEATER_OWNER')")
+    public ResponseEntity<?> deleteProfile(
+            @AuthenticationPrincipal User user,
+            @RequestBody Map<String, String> request) {
+        String password = request.get("password");
+        if (password == null || password.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("message", "Password is required"));
+        }
+        userService.deleteUser(user, password);
+        return ResponseEntity.ok(Map.of("message", "Account deleted successfully"));
     }
 }

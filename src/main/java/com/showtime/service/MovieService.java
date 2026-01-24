@@ -1,6 +1,7 @@
 package com.showtime.service;
 
 import com.showtime.dto.*;
+
 import com.showtime.dto.response.*;
 import com.showtime.dto.request.*;
 import com.showtime.model.Movie;
@@ -13,6 +14,10 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.PageRequest;
 
 @Service
 @RequiredArgsConstructor
@@ -45,14 +50,14 @@ public class MovieService {
             .collect(Collectors.toList());
     }
     
-    public List<MovieDTO> filterMovies(MovieFilterRequest filter) {
-        LocalDate date = filter.getDate() != null ? filter.getDate() : LocalDate.now();
-        return movieRepository.findMoviesWithFilters(
-            date, filter.getCity(), filter.getLanguage(), filter.getGenre()
-        ).stream()
-            .map(this::convertToDTO)
-            .collect(Collectors.toList());
-    }
+//    public List<MovieDTO> filterMovies(MovieFilterRequest filter) {
+//        LocalDate date = filter.getDate() != null ? filter.getDate() : LocalDate.now();
+//        return movieRepository.findMoviesWithFilters(
+//            date, filter.getCity(), filter.getLanguage(), filter.getGenre()
+//        ).stream()
+//            .map(this::convertToDTO)
+//            .collect(Collectors.toList());
+//    }
     
     @Transactional
     public MovieDTO createMovie(MovieRequest request) {
@@ -81,6 +86,16 @@ public class MovieService {
     
     public Long getTotalMovies() {
         return movieRepository.countActiveMovies();
+    }
+    
+ // Get count of active movies
+    public Long getActiveMoviesCount() {
+        return movieRepository.countActiveMovies();
+    }
+    
+    // Get count of upcoming movies
+    public Long getUpcomingMoviesCount() {
+        return movieRepository.countUpcomingMovies();
     }
     
     private void updateMovieFromRequest(Movie movie, MovieRequest request) {
@@ -118,5 +133,29 @@ public class MovieService {
         dto.setCertification(movie.getCertification().name());
         dto.setActive(movie.isActive());
         return dto;
+    }
+    
+    public Page<MovieDTO> filterMovies(MovieFilterRequest filter) {
+    	
+    	System.out.println("Filtered Movies "+filter);
+        Pageable pageable = PageRequest.of(
+            filter.getPage(), 
+            filter.getSize(),
+            Sort.by(
+                filter.getSortOrder().equalsIgnoreCase("desc") ? 
+                    Sort.Direction.DESC : Sort.Direction.ASC, 
+                filter.getSortBy()
+            )
+        );
+        
+        LocalDate date = filter.getDate() != null ? filter.getDate() : LocalDate.now();
+        
+        return movieRepository.findMoviesWithFilters(
+            date, 
+            filter.getCity(), 
+            filter.getLanguage(), 
+            filter.getGenre(),
+            pageable
+        ).map(this::convertToDTO);
     }
 }

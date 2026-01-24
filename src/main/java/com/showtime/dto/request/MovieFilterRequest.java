@@ -1,10 +1,7 @@
 package com.showtime.dto.request;
 
-import java.time.LocalDate;
-
-
-
 import lombok.Data;
+import java.time.LocalDate;
 
 @Data
 public class MovieFilterRequest {
@@ -14,4 +11,6 @@ public class MovieFilterRequest {
     private LocalDate date;
     private String sortBy = "releaseDate";
     private String sortOrder = "desc";
+    private Integer page = 0;
+    private Integer size = 12;
 }

@@ -23,4 +23,6 @@ public interface TheaterRepository extends JpaRepository<Theater, Long> {
     
     @Query("SELECT COUNT(t) FROM Theater t WHERE t.isActive = true")
     Long countActiveTheaters();
+    
+    Long countByIsActiveTrue();
 }

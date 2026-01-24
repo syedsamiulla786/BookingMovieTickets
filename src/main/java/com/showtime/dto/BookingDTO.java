@@ -10,7 +10,7 @@ public class BookingDTO {
     private String bookingReference;
     private UserDTO user;
     private ShowDTO show;
-    private List<String> seatNumbers;
+    private List<String> seatNumbers; // Keep as List<String> for JSON
     private String seatType;
     private Integer totalSeats;
     private Double totalAmount;
@@ -21,4 +21,6 @@ public class BookingDTO {
     private LocalDateTime bookedAt;
     private PaymentDTO payment;
     private List<TicketDTO> tickets;
+    
+    // No setSeatNumbers method - it will be set directly
 }

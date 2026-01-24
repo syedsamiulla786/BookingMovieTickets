@@ -2,6 +2,7 @@ package com.showtime.controller;
 
 import com.showtime.dto.*;
 
+
 import com.showtime.service.MovieService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -9,6 +10,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import com.showtime.dto.request.*;
 import com.showtime.dto.response.*;
+import org.springframework.data.domain.Page;
 
 import java.util.List;
 import java.util.Map;
@@ -41,7 +43,7 @@ public class MovieController {
     }
     
     @PostMapping("/filter")
-    public ResponseEntity<List<MovieDTO>> filterMovies(@RequestBody MovieFilterRequest filter) {
+    public ResponseEntity<Page<MovieDTO>> filterMovies(@RequestBody MovieFilterRequest filter) {
         return ResponseEntity.ok(movieService.filterMovies(filter));
     }
     

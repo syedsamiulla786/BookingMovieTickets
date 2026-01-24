@@ -1,10 +1,14 @@
 package com.showtime.repository;
 
 import com.showtime.model.Movie;
+import com.showtime.model.User;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Page;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -40,4 +44,41 @@ public interface MovieRepository extends JpaRepository<Movie, Long> {
     
     @Query("SELECT COUNT(m) FROM Movie m WHERE m.isActive = true")
     Long countActiveMovies();
+    
+    // Count upcoming movies (release date > today)
+    @Query("SELECT COUNT(m) FROM Movie m WHERE m.releaseDate > CURRENT_DATE")
+    Long countUpcomingMovies();
+    
+    // Search users by name or email
+    @Query("SELECT u FROM User u WHERE " +
+           "LOWER(u.name) LIKE LOWER(CONCAT('%', :query, '%')) OR " +
+           "LOWER(u.email) LIKE LOWER(CONCAT('%', :query, '%'))")
+    List<User> searchUsers(@Param("query") String query);
+    
+    
+    @Query("SELECT m FROM Movie m WHERE m.isActive = true " +
+    	       "AND (:language IS NULL OR LOWER(m.language) LIKE LOWER(CONCAT('%', :language, '%'))) " +
+    	       "AND (:genre IS NULL OR LOWER(m.genre) LIKE LOWER(CONCAT('%', :genre, '%'))) " +
+    	       "AND (:city IS NULL OR m.id IN (" +
+    	       "    SELECT DISTINCT s.movie.id FROM Show s " +
+    	       "    JOIN s.theater t " +
+    	       "    WHERE s.isActive = true " +
+    	       "    AND (:date IS NULL OR s.showDate >= :date) " +
+    	       "    AND LOWER(t.city) LIKE LOWER(CONCAT('%', :city, '%'))" +
+    	       "))")
+    	Page<Movie> findMoviesWithFilters(
+    	     @Param("date") LocalDate date,
+    	     @Param("city") String city,
+    	     @Param("language") String language,
+    	     @Param("genre") String genre,
+    	     Pageable pageable
+    	);
+    
+    
+    
+    
+    
+    
+    
+    
 }

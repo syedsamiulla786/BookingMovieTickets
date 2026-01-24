@@ -70,6 +70,10 @@ public class TheaterService {
         return theaterRepository.countActiveTheaters();
     }
     
+    public Long getActiveTheatersCount() {
+        return theaterRepository.countByIsActiveTrue();
+    }
+    
     private void updateTheaterFromRequest(Theater theater, TheaterRequest request) {
         theater.setName(request.getName());
         theater.setAddress(request.getAddress());

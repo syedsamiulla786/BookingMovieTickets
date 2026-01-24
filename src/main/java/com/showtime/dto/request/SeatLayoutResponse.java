@@ -1,4 +1,4 @@
-package com.showtime.dto.response;
+package com.showtime.dto.request;
 
 import lombok.Data;
 import java.util.List;
@@ -11,9 +11,7 @@ import com.showtime.dto.SeatDTO;
 public class SeatLayoutResponse {
     private Long showId;
     private List<List<SeatDTO>> seatLayout;
-    private Double classicPrice;
-    private Double premiumPrice;
-    private Map<String, Double> seatPrices;
+    private Map<String, Double> seatPrices; // {"CLASSIC": 200, "PREMIUM": 350}
     private List<String> bookedSeats;
     private List<String> lockedSeats;
     private Integer totalSeats;

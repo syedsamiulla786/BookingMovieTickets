@@ -19,6 +19,7 @@ public class UserService {
     
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
+    private final BookingService bookingService;
     
     public UserDTO getCurrentUser(User user) {
         return convertToDTO(user);
@@ -60,8 +61,50 @@ public class UserService {
         return userRepository.countAllUsers();
     }
     
+    // Search users by name or email
+    public List<UserDTO> searchUsers(String query) {
+        List<User> users = userRepository.searchUsers(query);
+        return users.stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList());
+    }
+    
+    public List<BookingDTO> getUserBookings(User user) {
+        return bookingService.getUserBookings(Long.toString(user.getId()));
+    }
+    
+    @Transactional
+    public void deleteUser(User user, String password) {
+        if (!passwordEncoder.matches(password, user.getPassword())) {
+            throw new RuntimeException("Incorrect password");
+        }
+        userRepository.delete(user);
+    }
+    
+    @Transactional
+    public void addToWishlist(User user, Long movieId) {
+        // Implementation depends on your data model
+        // For now, just a placeholder
+        user = userRepository.save(user);
+    }
+    
+    @Transactional
+    public void removeFromWishlist(User user, Long movieId) {
+        // Implementation depends on your data model
+        // For now, just a placeholder
+        user = userRepository.save(user);
+    }
+    
+    public List<MovieDTO> getWishlist(User user) {
+        // Implementation depends on your data model
+        // For now, return empty list
+        return List.of();
+    }
+    
     private UserDTO convertToDTO(User user) {
         UserDTO dto = new UserDTO();
+        if(user == null)
+        	return dto;
         dto.setId(user.getId());
         dto.setName(user.getName());
         dto.setEmail(user.getEmail());

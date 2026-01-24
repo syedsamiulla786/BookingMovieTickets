@@ -1,6 +1,8 @@
 package com.showtime.repository;
 
 import com.showtime.model.Screen;
+import com.showtime.model.Theater;
+
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -30,4 +32,12 @@ public interface ScreenRepository extends JpaRepository<Screen, Long> {
     
     @Query("SELECT s FROM Screen s WHERE s.theater.city = :city AND s.isActive = true")
     List<Screen> findScreensByCity(@Param("city") String city);
+    
+    @Query("SELECT s FROM Screen s WHERE s.theater = :theater AND s.screenNumber = :screenNumber")
+    Optional<Screen> findByTheaterAndScreenNumber(
+        @Param("theater") Theater theater,
+        @Param("screenNumber") Integer screenNumber
+    );
+
+    
 }

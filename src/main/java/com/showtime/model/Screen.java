@@ -29,12 +29,9 @@ public class Screen {
     @Column(name = "total_seats")
     private Integer totalSeats = 100;
     
-    @Column(name = "seats_layout")
-    private String seatsLayout; // JSON array of seat layout
+    @Column(name = "seats_layout", columnDefinition = "LONGTEXT")
+    private String seatsLayout; // Use LONGTEXT for large JSON
     
     @Column(name = "is_active")
     private boolean isActive = true;
-    
-    @OneToMany(mappedBy = "screen", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
-    private java.util.List<Show> shows = new java.util.ArrayList<>();
 }

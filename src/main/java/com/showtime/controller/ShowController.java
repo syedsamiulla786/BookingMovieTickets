@@ -13,6 +13,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 
@@ -93,23 +94,4 @@ public class ShowController {
         return ResponseEntity.ok(showService.toggleShowActive(id));
     }
     
-    // Book seats temporarily (for seat selection)
-    @PostMapping("/{showId}/book-seats")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
-    public ResponseEntity<Map<String, String>> bookSeats(
-            @PathVariable Long showId,
-            @RequestBody SeatSelectionRequest request) {
-        showService.updateBookedSeats(showId, request.getSeatNumbers());
-        return ResponseEntity.ok(Map.of("message", "Seats booked successfully"));
-    }
-    
-    // Release seats (for cancellation)
-    @PostMapping("/{showId}/release-seats")
-    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
-    public ResponseEntity<Map<String, String>> releaseSeats(
-            @PathVariable Long showId,
-            @RequestBody SeatSelectionRequest request) {
-        showService.releaseBookedSeats(showId, request.getSeatNumbers());
-        return ResponseEntity.ok(Map.of("message", "Seats released successfully"));
-    }
 }

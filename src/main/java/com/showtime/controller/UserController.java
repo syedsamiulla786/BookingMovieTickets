@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -31,7 +32,7 @@ public class UserController {
     @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     public ResponseEntity<UserDTO> updateProfile(
             @RequestBody ProfileUpdateRequest request,
-            @AuthenticationPrincipal User user) {
+            @AuthenticationPrincipal  User user) {
         return ResponseEntity.ok(userService.updateProfile(user, request));
     }
     

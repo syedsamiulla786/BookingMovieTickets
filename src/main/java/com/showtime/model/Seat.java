@@ -44,7 +44,7 @@ public class Seat {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "booking_id")
-    private Booking booking;
+    private Booking booking;  // to get booked seats data
     
     @Column(name = "locked_until")
     private java.time.LocalDateTime lockedUntil;

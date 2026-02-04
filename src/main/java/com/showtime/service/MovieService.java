@@ -124,8 +124,8 @@ public class MovieService {
         dto.setDirector(movie.getDirector());
         dto.setDuration(movie.getDuration());
         dto.setLanguage(movie.getLanguage());
-        dto.setGenre(movie.getGenre());
-        dto.setRating(movie.getRating());
+        dto.setGenre(movie.getGenre()); Double rat=Math.floor(Math.random()*9);
+        dto.setRating((rat<5.89?5.8:rat<9.34?rat+0.45:9.6));
         dto.setReleaseDate(movie.getReleaseDate());
         dto.setPosterUrl(movie.getPosterUrl());
         dto.setTrailerUrl(movie.getTrailerUrl());
@@ -143,7 +143,7 @@ public class MovieService {
             filter.getSize(),
             Sort.by(
                 filter.getSortOrder().equalsIgnoreCase("desc") ? 
-                    Sort.Direction.DESC : Sort.Direction.ASC, 
+                    Sort.Direction.DESC: Sort.Direction.ASC, 
                 filter.getSortBy()
             )
         );

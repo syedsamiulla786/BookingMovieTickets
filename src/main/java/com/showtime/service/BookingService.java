@@ -1,29 +1,19 @@
 package com.showtime.service;
 
 import com.showtime.dto.*;
+import com.showtime.dto.request.BookingRequest;
+import com.showtime.dto.response.BookingResponse;
 import com.showtime.model.*;
-import com.showtime.model.Booking.BookingStatus;
 import com.showtime.repository.*;
-import com.showtime.service.EmailService;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+//import com.showtime.util.EmailService;
 import lombok.RequiredArgsConstructor;
-
 import org.springframework.stereotype.Service;
-import com.showtime.dto.response.*;
-import com.showtime.exception.ResourceNotFoundException;
-import com.showtime.exception.ValidationException;
-import com.showtime.dto.request.*;
 import org.springframework.transaction.annotation.Transactional;
 
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.domain.PageRequest;
-import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -33,12 +23,11 @@ public class BookingService {
     private final BookingRepository bookingRepository;
     private final UserRepository userRepository;
     private final ShowRepository showRepository;
+    private final SeatRepository seatRepository;
     private final PaymentRepository paymentRepository;
     private final EmailService emailService;
-    private final ObjectMapper objectMapper;
-    private final NotificationService notificationService;
-    private final SeatRepository seatRepository;
     
+    // Create booking
     @Transactional
     public BookingResponse createBooking(BookingRequest request, User user) {
         // Get show
@@ -50,52 +39,63 @@ public class BookingService {
             request.getShowId(), request.getSeatNumbers());
         
         // Validate seat availability
-        validateSeats(seats, request.getSeatNumbers());
+        validateSeatAvailability(seats, request.getSeatNumbers());
         
-        // Calculate total
-        double totalAmount = calculateTotal(seats);
+        // Calculate total amount
+        double seatTotal = seats.stream()
+            .mapToDouble(Seat::getPrice)
+            .sum();
         double convenienceFee = 30.0 * seats.size();
-        double taxAmount = totalAmount * 0.18;
-        double finalAmount = totalAmount + convenienceFee + taxAmount;
+        double taxAmount = seatTotal * 0.18;
+        double totalAmount = seatTotal + convenienceFee + taxAmount;
+        
+        // Generate booking reference
+        String bookingReference = "BKG" + System.currentTimeMillis() + user.getId();
         
         // Create booking
-        String bookingRef = "BKG" + System.currentTimeMillis() + user.getId();
-        
         Booking booking = new Booking();
-        booking.setBookingReference(bookingRef);
+        booking.setBookingReference(bookingReference);
         booking.setUser(user);
         booking.setShow(show);
+        booking.setSeatNumbers(String.join(",", request.getSeatNumbers()));
+        booking.setSeatType(request.getSeatType());
         booking.setTotalSeats(seats.size());
-        booking.setTotalAmount(finalAmount);
+        booking.setTotalAmount(totalAmount);
         booking.setConvenienceFee(convenienceFee);
         booking.setTaxAmount(taxAmount);
         booking.setBookingStatus(Booking.BookingStatus.CONFIRMED);
         booking.setPaymentStatus(Booking.PaymentStatus.PENDING);
-        
-        // Store seat numbers as JSON
-        booking.setSeatNumbers(convertToJson(request.getSeatNumbers()));
+        booking.setBookedAt(LocalDateTime.now());
         
         Booking savedBooking = bookingRepository.save(booking);
         
-        // Update seat status
-        updateSeatStatus(seats, savedBooking, Seat.SeatStatus.BOOKED);
+        // Update seat status to BOOKED
+        seats.forEach(seat -> {
+            seat.setStatus(Seat.SeatStatus.BOOKED);
+            seat.setBooking(savedBooking);
+        });
+        seatRepository.saveAll(seats);
         
-        // Create payment
-        createPayment(savedBooking, request.getPaymentMethod(), finalAmount);
+        // Create payment record
+        createPayment(savedBooking, request.getPaymentMethod(), totalAmount);
         
         // Generate tickets
         List<TicketDTO> tickets = generateTickets(savedBooking, seats);
         
+        // Send confirmation email
+        emailService.sendBookingConfirmation(user.getEmail(), savedBooking);
+        
         return new BookingResponse(
             savedBooking.getId(),
-            bookingRef,
-            finalAmount,
+            bookingReference,
+            totalAmount,
             "PENDING",
             tickets
         );
     }
     
-    private void validateSeats(List<Seat> seats, List<String> requestedSeats) {
+    // Validate seat availability
+    private void validateSeatAvailability(List<Seat> seats, List<String> requestedSeats) {
         if (seats.size() != requestedSeats.size()) {
             throw new RuntimeException("Some seats are not available");
         }
@@ -107,20 +107,7 @@ public class BookingService {
         }
     }
     
-    private double calculateTotal(List<Seat> seats) {
-        return seats.stream()
-            .mapToDouble(Seat::getPrice)
-            .sum();
-    }
-    
-    private void updateSeatStatus(List<Seat> seats, Booking booking, Seat.SeatStatus status) {
-        seats.forEach(seat -> {
-            seat.setStatus(status);
-            seat.setBooking(booking);
-        });
-        seatRepository.saveAll(seats);
-    }
-    
+    // Create payment record
     private void createPayment(Booking booking, String paymentMethod, double amount) {
         Payment payment = new Payment();
         payment.setBooking(booking);
@@ -130,88 +117,58 @@ public class BookingService {
         paymentRepository.save(payment);
     }
     
+    // Generate tickets
     private List<TicketDTO> generateTickets(Booking booking, List<Seat> seats) {
-        return seats.stream()
-            .map(seat -> createTicketDTO(booking, seat))
-            .collect(Collectors.toList());
-    }
-    
-    private TicketDTO createTicketDTO(Booking booking, Seat seat) {
-        TicketDTO ticket = new TicketDTO();
-        ticket.setTicketNumber("TKT" + System.currentTimeMillis() + seat.getSeatNumber());
-        ticket.setSeatNumber(seat.getSeatNumber());
-        ticket.setSeatType(seat.getSeatType().name());
-        ticket.setPrice(seat.getPrice());
-        ticket.setQrCodeUrl("/api/tickets/" + booking.getBookingReference() + "/qr");
-        ticket.setIsUsed(false);
-        return ticket;
-    }
-    
-    
-    
-//    private void updateShowBookedSeats(Show show, List<String> seatNumbers) {
-//        try {
-//            List<String> bookedSeats = objectMapper.readValue(show.getBookedSeats(), List.class);
-//            bookedSeats.addAll(seatNumbers);
-//            show.setBookedSeats(objectMapper.writeValueAsString(bookedSeats));
-//            show.setAvailableSeats(show.getAvailableSeats() - seatNumbers.size());
-//            showRepository.save(show);
-//        } catch (JsonProcessingException e) {
-//            throw new RuntimeException("Error updating show seats");
-//        }
-//    }
-    
-    private String convertToJson(List<String> seatNumbers) {
-        try {
-            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            return mapper.writeValueAsString(seatNumbers);
-        } catch (Exception e) {
-            return "[]";
+        List<TicketDTO> tickets = new ArrayList<>();
+        
+        for (Seat seat : seats) {
+            TicketDTO ticket = new TicketDTO();
+            ticket.setTicketNumber("TKT" + UUID.randomUUID().toString().substring(0, 8));
+            ticket.setSeatNumber(seat.getSeatNumber());
+            ticket.setSeatType(seat.getSeatType().name());
+            ticket.setPrice(seat.getPrice());
+            ticket.setQrCodeUrl("/api/tickets/" + booking.getBookingReference() + "/" + seat.getSeatNumber());
+            ticket.setIsUsed(false);
+            ticket.setCreatedAt(LocalDateTime.now());
+            
+            tickets.add(ticket);
         }
+        
+        return tickets;
     }
     
-    private void generateTickets(Booking booking, List<String> seatNumbers, double seatPrice) {
-        for (String seatNumber : seatNumbers) {
-            Ticket ticket = new Ticket();
-            ticket.setBooking(booking);
-            ticket.setTicketNumber("TKT" + System.currentTimeMillis() + seatNumber);
-            ticket.setSeatNumber(seatNumber);
-            ticket.setSeatType(booking.getSeatType());
-            ticket.setPrice(seatPrice);
-            // Generate QR code URL (in real app, generate actual QR code)
-            ticket.setQrCodeUrl("/api/bookings/" + booking.getId() + "/ticket/" + ticket.getTicketNumber() + "/qr");
-        }
-    }
-    
-    public List<BookingDTO> getUserBookings(String userId) {
-    	Optional<User> user = userRepository.findByEmail(userId);
-        return bookingRepository.findByUserIdOrderByBookedAtDesc(user.get().getId()).stream()
+    // Get user bookings
+    public List<BookingDTO> getUserBookings(String username) {
+        User user = userRepository.findByEmail(username)
+            .orElseThrow(() -> new RuntimeException("User not found"));
+        
+        return bookingRepository.findByUserIdOrderByBookedAtDesc(user.getId()).stream()
             .map(this::convertToDTO)
             .collect(Collectors.toList());
     }
     
-    public BookingHistoryDTO getUserBookingHistory(Long userId) {
-        BookingHistoryDTO history = new BookingHistoryDTO();
-        history.setUpcomingBookings(bookingRepository.findUpcomingBookings(userId).stream()
-            .map(this::convertToDTO)
-            .collect(Collectors.toList()));
-        history.setPastBookings(bookingRepository.findPastBookings(userId).stream()
-            .map(this::convertToDTO)
-            .collect(Collectors.toList()));
-        history.setCancelledBookings(bookingRepository.findByUserIdAndBookingStatusOrderByBookedAtDesc(
-            userId, "CANCELLED").stream()
-            .map(this::convertToDTO)
-            .collect(Collectors.toList()));
-        return history;
+    // Get booking by ID
+    public BookingDTO getBookingById(Long id, User user) {
+        Booking booking = bookingRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Booking not found"));
+        
+        // Check if user owns the booking or is admin
+        if (!booking.getUser().getId().equals(user.getId()) && 
+            user.getRole() != User.Role.ADMIN) {
+            throw new RuntimeException("Access denied");
+        }
+        
+        return convertToDTO(booking);
     }
     
+    // Cancel booking
     @Transactional
     public void cancelBooking(Long bookingId, String reason) {
         Booking booking = bookingRepository.findById(bookingId)
             .orElseThrow(() -> new RuntimeException("Booking not found"));
         
-        if (!booking.getBookingStatus().equals(Booking.BookingStatus.CONFIRMED)) {
-            throw new RuntimeException("Booking cannot be cancelled");
+        if (booking.getBookingStatus() != Booking.BookingStatus.CONFIRMED) {
+            throw new RuntimeException("Only confirmed bookings can be cancelled");
         }
         
         // Update booking status
@@ -219,48 +176,75 @@ public class BookingService {
         booking.setCancelledAt(LocalDateTime.now());
         booking.setCancellationReason(reason);
         booking.setPaymentStatus(Booking.PaymentStatus.REFUNDED);
-        bookingRepository.save(booking);
+        
+        // Releasing seats
+        List<Seat> seats = seatRepository.findByBookingId(bookingId);
+        seats.forEach(seat -> {
+            seat.setStatus(Seat.SeatStatus.AVAILABLE);
+            seat.setBooking(null);
+        });
+        seatRepository.saveAll(seats);
         
         // Update payment status
-        Optional<Payment> paymentOpt = paymentRepository.findById(booking.getPayment().getId());
-        if (paymentOpt.isPresent()) {
-            Payment payment = paymentOpt.get();
-            payment.setStatus(Payment.PaymentStatus.REFUNDED);
-            payment.setRefundDate(LocalDateTime.now());
-            payment.setRefundAmount(booking.getTotalAmount());
-            payment.setRefundReason(reason);
-            paymentRepository.save(payment);
-        }
+        Payment payment = paymentRepository.findByBookingId(bookingId)
+            .orElseThrow(() -> new RuntimeException("Payment not found"));
+        payment.setStatus(Payment.PaymentStatus.REFUNDED);
+        payment.setRefundDate(LocalDateTime.now());
+        payment.setRefundAmount(booking.getTotalAmount());
+        payment.setRefundReason(reason);
+        paymentRepository.save(payment);
         
-        // Update show available seats
-        try {
-            Show show = booking.getShow();
-            List<String> bookedSeats = objectMapper.readValue(show.getBookedSeats(), List.class);
-            List<String> cancelledSeats = objectMapper.readValue(booking.getSeatNumbers(), List.class);
-            bookedSeats.removeAll(cancelledSeats);
-            show.setBookedSeats(objectMapper.writeValueAsString(bookedSeats));
-            show.setAvailableSeats(show.getAvailableSeats() + cancelledSeats.size());
-            showRepository.save(show);
-        } catch (JsonProcessingException e) {
-            throw new RuntimeException("Error updating show seats");
-        }
+        bookingRepository.save(booking);
         
         // Send cancellation email
         emailService.sendBookingCancellation(booking.getUser().getEmail(), booking);
     }
     
-    public Long getTotalBookings() {
-        return bookingRepository.countConfirmedBookings();
+    // Get booking history
+    public BookingHistoryDTO getUserBookingHistory(Long userId) {
+        BookingHistoryDTO history = new BookingHistoryDTO();
+        
+        history.setUpcomingBookings(
+            bookingRepository.findUpcomingBookings(userId).stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList())
+        );
+        
+        history.setPastBookings(
+            bookingRepository.findPastBookings(userId).stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList())
+        );
+        
+        history.setCancelledBookings(
+            bookingRepository.findByUserIdAndBookingStatusOrderByBookedAtDesc(
+                userId, "CANCELLED").stream()
+                .map(this::convertToDTO)
+                .collect(Collectors.toList())
+        );
+        
+        return history;
     }
     
-    public Double getTotalRevenue() {
-        return bookingRepository.getTotalRevenue();
-    }
-    
-    public BookingDTO convertToDTO(Booking booking) {
+    // Convert Booking to BookingDTO
+    private BookingDTO convertToDTO(Booking booking) {
         BookingDTO dto = new BookingDTO();
         dto.setId(booking.getId());
         dto.setBookingReference(booking.getBookingReference());
+        
+        // Parsing seat numbers
+        List<String> seatNumbers = new ArrayList<>();
+        if (booking.getSeatNumbers() != null) {
+            String[] seats = booking.getSeatNumbers().split(",");
+            for (String seat : seats) {
+                if (!seat.trim().isEmpty()) {
+                    seatNumbers.add(seat.trim());
+                }
+            }
+        }
+        dto.setSeatNumbers(seatNumbers);
+        
+        dto.setSeatType(booking.getSeatType());
         dto.setTotalSeats(booking.getTotalSeats());
         dto.setTotalAmount(booking.getTotalAmount());
         dto.setConvenienceFee(booking.getConvenienceFee());
@@ -269,22 +253,19 @@ public class BookingService {
         dto.setPaymentStatus(booking.getPaymentStatus().name());
         dto.setBookedAt(booking.getBookedAt());
         
-        try {
-            dto.setSeatNumbers(objectMapper.readValue(booking.getSeatNumbers(), List.class));
-        } catch (JsonProcessingException e) {
-            dto.setSeatNumbers(new ArrayList<>());
-        }
-        
+        // Convert Show to ShowDTO
         if (booking.getShow() != null) {
             ShowDTO showDTO = new ShowDTO();
             showDTO.setId(booking.getShow().getId());
             showDTO.setShowDate(booking.getShow().getShowDate());
             showDTO.setShowTime(booking.getShow().getShowTime());
+            showDTO.setEndTime(booking.getShow().getEndTime());
             
             if (booking.getShow().getMovie() != null) {
                 MovieDTO movieDTO = new MovieDTO();
                 movieDTO.setId(booking.getShow().getMovie().getId());
                 movieDTO.setTitle(booking.getShow().getMovie().getTitle());
+                movieDTO.setDuration(booking.getShow().getMovie().getDuration());
                 showDTO.setMovie(movieDTO);
             }
             
@@ -299,128 +280,27 @@ public class BookingService {
             dto.setShow(showDTO);
         }
         
+        // Get payment details
+        Payment payment = paymentRepository.findByBookingId(booking.getId()).orElse(null);
+        if (payment != null) {
+            PaymentDTO paymentDTO = new PaymentDTO();
+            paymentDTO.setId(payment.getId());
+            paymentDTO.setPaymentMethod(payment.getPaymentMethod());
+            paymentDTO.setAmount(payment.getAmount());
+            paymentDTO.setStatus(payment.getStatus().name());
+//            paymentDTO.setPaymentDate(payment.getPaymentDate());
+            dto.setPayment(paymentDTO);
+        }
+        
         return dto;
     }
     
-     public List<BookingDTO> getAllBookings(int page, int size) {
-    	 Sort s = Sort.by("bookedAt").descending();
-         Pageable pageable = (Pageable) PageRequest.of(page, size,s);
-         Page<Booking> bookings = bookingRepository.findAll(pageable);
-         
-         return bookings.stream()
-             .map(this::convertToDTO)
-             .collect(Collectors.toList());
-     }
-     
-     public void updateBookingStatus(Long bookingId, String status) {
-         Booking booking = bookingRepository.findById(bookingId)
-             .orElseThrow(() -> new ResourceNotFoundException("Booking", "id", bookingId));
-         
-         // Validate status transition
-         validateStatusTransition(booking.getBookingStatus(), status);
-         
-         // Update status
-         booking.setBookingStatus(Booking.BookingStatus.valueOf(status.toUpperCase()));
-         
-         // If cancelling, update payment status too
-         if (status.equalsIgnoreCase("CANCELLED")) {
-             booking.setPaymentStatus(Booking.PaymentStatus.REFUNDED);
-             booking.setCancelledAt(LocalDateTime.now());
-             
-             // Update available seats
-             updateAvailableSeatsOnCancellation(booking);
-             
-             // Send cancellation notification
-             notificationService.sendNotification(
-                 booking.getUser().getId(),
-                 "Booking Cancelled",
-                 "Your booking " + booking.getBookingReference() + " has been cancelled by admin",
-                 "booking_cancelled"
-             );
-         }
-         
-         bookingRepository.save(booking);
-     }
-     
-     private void validateStatusTransition(BookingStatus bookingStatus, String newStatus) {
-         Map<String, List<String>> allowedTransitions = Map.of(
-             "CONFIRMED", List.of("CANCELLED", "EXPIRED"),
-             "PENDING", List.of("CONFIRMED", "CANCELLED"),
-             "CANCELLED", List.of(), // Cannot change from cancelled
-             "EXPIRED", List.of()    // Cannot change from expired
-         );
-         
-         List<String> allowed = allowedTransitions.get(bookingStatus);
-         if (allowed == null || !allowed.contains(newStatus.toUpperCase())) {
-             throw new ValidationException(
-                 "Invalid status transition from " + bookingStatus + " to " + newStatus
-             );
-         }
-     }
-     
-     private List<String> parseSeatNumbers(String seatNumbersJson) {
-    	    try {
-    	        com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-    	        return mapper.readValue(seatNumbersJson, 
-    	            mapper.getTypeFactory().constructCollectionType(List.class, String.class));
-    	    } catch (Exception e) {
-    	        return new java.util.ArrayList<>();
-    	    }
-    	}
-
-//    	private ShowDTO convertShowToDTO(Show show) {
-//    	    ShowDTO dto = new ShowDTO();
-//    	    dto.setId(show.getId());
-//    	    dto.setShowDate(show.getShowDate());
-//    	    dto.setShowTime(show.getShowTime());
-//    	    
-//    	    if (show.getMovie() != null) {
-//    	        dto.setMovie(convertMovieToDTO(show.getMovie()));
-//    	    }
-//    	    
-//    	    if (show.getTheater() != null) {
-//    	        dto.setTheater(convertTheaterToDTO(show.getTheater()));
-//    	    }
-//    	    
-//    	    return dto;
-//    	}
-     
-     private void updateAvailableSeatsOnCancellation(Booking booking) {
-         try {
-             Show show = booking.getShow();
-             List<String> cancelledSeats = objectMapper.readValue(booking.getSeatNumbers(), List.class);
-             List<String> bookedSeats = objectMapper.readValue(show.getBookedSeats(), List.class);
-             
-             // Remove cancelled seats from booked seats
-             bookedSeats.removeAll(cancelledSeats);
-             
-             // Update show
-             show.setBookedSeats(objectMapper.writeValueAsString(bookedSeats));
-             show.setAvailableSeats(show.getAvailableSeats() + cancelledSeats.size());
-             showRepository.save(show);
-             
-         } catch (JsonProcessingException e) {
-             throw new RuntimeException("Error updating seats on cancellation");
-         }
-     }
-     
-     public Long getTodaysBookingsCount() {
-         LocalDate today = LocalDate.now();
-         return bookingRepository.countByBookedAtBetween(
-             today.atStartOfDay(),
-             today.atTime(LocalTime.MAX)
-         );
-     }
-     
-     public List<Object[]> getMonthlyRevenue() {
-         LocalDateTime sixMonthsAgo = LocalDateTime.now().minusMonths(6);
-         return bookingRepository.getMonthlyRevenue(sixMonthsAgo);
-     }
-     
-     public Page<BookingDTO> getAllBookings(Pageable pageable) {
-         Page<Booking> bookings = bookingRepository.findAll(pageable);
-         return bookings.map(this::convertToDTO);
-     }
+    // Get statistics
+    public Long getTotalBookings() {
+        return bookingRepository.countConfirmedBookings();
+    }
     
-    
+    public Double getTotalRevenue() {
+        return bookingRepository.getTotalRevenue();
+    }
 }

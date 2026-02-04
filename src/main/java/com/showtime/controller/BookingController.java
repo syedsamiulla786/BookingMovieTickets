@@ -35,20 +35,19 @@ public class BookingController {
     private final UserRepository userRepository;
     
     @PostMapping
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     public ResponseEntity<BookingResponse> createBooking(
             @RequestBody BookingRequest request,
-            @AuthenticationPrincipal UserDetails userDetails) { // Changed from User to UserDetails
-        
-        // Get the user entity from the repository
+            @AuthenticationPrincipal UserDetails userDetails) {
+
         User user = userRepository.findByEmail(userDetails.getUsername())
-            .orElseThrow(() -> new RuntimeException("User not found"));
+            .orElseThrow(() -> new ResourceNotFoundException("User not found"));
         
         return ResponseEntity.ok(bookingService.createBooking(request, user));
     }
     
     @GetMapping("/my-bookings")
-    @PreAuthorize("hasRole('USER')")
+    @PreAuthorize("hasRole('USER') or hasRole('ADMIN')")
     public ResponseEntity<List<BookingDTO>> getMyBookings(@AuthenticationPrincipal org.springframework.security.core.userdetails.User user) {
         return ResponseEntity.ok(bookingService.getUserBookings(user.getUsername()));
     }
@@ -58,21 +57,10 @@ public class BookingController {
     public ResponseEntity<BookingHistoryDTO> getMyBookingHistory(@AuthenticationPrincipal User user) {
         return ResponseEntity.ok(bookingService.getUserBookingHistory(user.getId()));
     }
-    
-//    @GetMapping("/{id}")
-//    @PreAuthorize("hasRole('USER')")
-//    public ResponseEntity<BookingDTO> getBookingById(@PathVariable Long id, @AuthenticationPrincipal User user) {
-//        List<BookingDTO> bookings = bookingService.getUserBookings(user.getEmail());
-//        BookingDTO booking = bookings.stream()
-//            .filter(b -> b.getId().equals(id))
-//            .findFirst()
-//            .orElseThrow(() -> new RuntimeException("Booking not found"));
-//        return ResponseEntity.ok(booking);
-//    }
-////    
+       
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<BookingDTO> getBookingById(
+    public ResponseEntity<?> getBookingById(
             @PathVariable Long id,
             @AuthenticationPrincipal User user) throws AccessDeniedException {
         
@@ -85,7 +73,7 @@ public class BookingController {
             throw new AccessDeniedException("You don't have permission to view this booking");
         }
         
-        return ResponseEntity.ok(bookingService.convertToDTO(booking) );
+        return ResponseEntity.ok(booking);
     }
     
     @PostMapping("/{id}/cancel")
@@ -100,7 +88,6 @@ public class BookingController {
     @GetMapping("/{id}/tickets")
     @PreAuthorize("hasRole('USER')")
     public ResponseEntity<List<TicketDTO>> getBookingTickets(@PathVariable Long id) {
-        // Implementation for getting tickets
         return ResponseEntity.ok(List.of());
     }
     

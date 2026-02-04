@@ -1,6 +1,7 @@
 package com.showtime.model;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -19,7 +20,7 @@ public class Booking {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     
-    @Column(name = "booking_reference", unique = true)
+    @Column(name = "booking_reference")//, unique = true
     private String bookingReference;
     
     @ManyToOne(fetch = FetchType.LAZY)
@@ -30,7 +31,8 @@ public class Booking {
     @JoinColumn(name = "show_id", nullable = false)
     private Show show;
     
-    @Column(name = "seat_numbers", nullable = false)
+    @Size(min=2,max=20)
+    @Column(name = "seat_numbers",length = 20, nullable = false)//length ->applies to varchar(20)
     private String seatNumbers; // JSON array
     
     @Column(name = "seat_type")
@@ -56,7 +58,7 @@ public class Booking {
     @Column(name = "payment_status")
     private PaymentStatus paymentStatus = PaymentStatus.PENDING;
     
-    @Column(name = "booked_at")
+    @Column(name = "booked_at", updatable = false)
     private LocalDateTime bookedAt = LocalDateTime.now();
     
     @Column(name = "cancelled_at")
@@ -68,11 +70,11 @@ public class Booking {
     @OneToOne(mappedBy = "booking", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private Payment payment;
     
-    @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "booking", cascade = CascadeType.ALL, fetch = FetchType.LAZY)// by default EAGER
     private List<Ticket> tickets = new ArrayList<>();
     
     public enum BookingStatus {
-        CONFIRMED, CANCELLED, EXPIRED
+        CONFIRMED,CANCELLED,EXPIRED
     }
     
     public enum PaymentStatus {

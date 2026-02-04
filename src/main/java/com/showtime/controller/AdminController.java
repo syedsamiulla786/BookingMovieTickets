@@ -25,6 +25,8 @@ public class AdminController {
     private final ShowService showService;
     private final BookingService bookingService;
     
+    
+    
     @GetMapping("/dashboard/stats")
     public ResponseEntity<DashboardStatsDTO> getDashboardStats() {
         DashboardStatsDTO stats = new DashboardStatsDTO();
@@ -34,17 +36,17 @@ public class AdminController {
         stats.setTotalUsers(userService.getTotalUsers());
         stats.setTotalRevenue(bookingService.getTotalRevenue());
         
-        // Convert Object[] to RevenueChartDTO
-        List<RevenueChartDTO> revenueChart = bookingService.getMonthlyRevenue().stream()
-            .map(data -> {
-                RevenueChartDTO dto = new RevenueChartDTO();
-                dto.setMonth((String) data[0]);
-                dto.setRevenue((Double) data[1]);
-                return dto;
-            })
-            .collect(Collectors.toList());
-        
-        stats.setRevenueChart(revenueChart);
+//        // Convert Object[] to RevenueChartDTO
+//        List<RevenueChartDTO> revenueChart = bookingService.getMonthlyRevenue().stream()
+//            .map(data -> {
+//                RevenueChartDTO dto = new RevenueChartDTO();
+//                dto.setMonth((String) data[0]);
+//                dto.setRevenue((Double) data[1]);
+//                return dto;
+//            })
+//            .collect(Collectors.toList());
+//        
+//        stats.setRevenueChart(revenueChart);
         return ResponseEntity.ok(stats);
     }
     
@@ -88,34 +90,18 @@ public class AdminController {
         return ResponseEntity.ok(analytics);
     }
     
-//    // BOOKING MANAGEMENT ENDPOINTS
-//    @GetMapping("/bookings")
-//    public ResponseEntity<List<BookingDTO>> getAllBookings(
-//            @RequestParam(defaultValue = "0") int page,
-//            @RequestParam(defaultValue = "10") int size) {
-//        return ResponseEntity.ok(bookingService.getAllBookings(page, size));
-//    }
-    
     @GetMapping("/bookings/revenue")
     public ResponseEntity<Map<String, Object>> getRevenueReport(
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate) {
         Map<String, Object> report = Map.of(
-            "totalRevenue", bookingService.getTotalRevenue(),
-            "monthlyRevenue", bookingService.getMonthlyRevenue(),
-            "todaysBookings", bookingService.getTodaysBookingsCount()
+            "totalRevenue", bookingService.getTotalRevenue()
+//            "monthlyRevenue", bookingService.getMonthlyRevenue(),
+//            "todaysBookings", bookingService.getTodaysBookingsCount()
         );
         return ResponseEntity.ok(report);
     }
-    
-    @PutMapping("/bookings/{id}/status")
-    public ResponseEntity<?> updateBookingStatus(
-            @PathVariable Long id,
-            @RequestBody Map<String, String> request) {
-        bookingService.updateBookingStatus(id, request.get("status"));
-        return ResponseEntity.ok(Map.of("message", "Booking status updated"));
-    }
-    
+        
     // SYSTEM ENDPOINTS
     @GetMapping("/system/health")
     public ResponseEntity<Map<String, Object>> getSystemHealth() {

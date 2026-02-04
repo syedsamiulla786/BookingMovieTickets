@@ -27,7 +27,7 @@ import java.util.Map;
 @CrossOrigin(origins = "*", maxAge = 3600)
 @RestController
 @RequestMapping("/api/auth")
-@RequiredArgsConstructor
+@RequiredArgsConstructor       
 public class AuthController {
     
     private final AuthenticationManager authenticationManager;
@@ -67,7 +67,7 @@ public class AuthController {
             	    user.getName(),
             	    user.getEmail(),
             	    user.getPhone(),
-            	    user.getRole().name()  
+            	    user.getRole().name()
             	);
 
             

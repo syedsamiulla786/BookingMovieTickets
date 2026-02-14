@@ -39,19 +39,13 @@ public class AuthController {
     
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
-        System.out.println("Login attempt for email: " + request.getEmail());
         
         try {
-            System.out.println("Attempting authentication...");
             Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
             );
             
-            System.out.println("Authentication successful!");
-            SecurityContextHolder.getContext().setAuthentication(authentication);
             String jwt = jwtUtils.generateJwtToken(authentication);
-//            jwt+=jwt.substring(0,21)+"rsr"+jwt.substring(21);
-            System.out.println("Token generated: " + jwt);
             
             UserDetails userDetails =
                     (UserDetails) authentication.getPrincipal();
@@ -59,6 +53,7 @@ public class AuthController {
             User user = userRepository
                     .findByEmail(userDetails.getUsername())
                     .orElseThrow();
+            
             System.out.println("User found: " + user.getEmail() + ", Role: " + user.getRole());
             
             AuthResponse response = new AuthResponse(
@@ -74,13 +69,10 @@ public class AuthController {
             return ResponseEntity.ok(response);
             
         } catch (BadCredentialsException e) {
-            System.out.println("BadCredentialsException: " + e.getMessage());
             return ResponseEntity.badRequest()
                 .body(Map.of("message", "Invalid email or password"));
         } catch (Exception e) {
-            System.out.println("General Exception during login: " + e.getClass().getName());
-            System.out.println("Exception message: " + e.getMessage());
-            e.printStackTrace();  // This will show the full stack trace
+            e.printStackTrace();
             return ResponseEntity.badRequest()
                 .body(Map.of("message", "Login failed: " + e.getMessage()));
         }
@@ -89,7 +81,6 @@ public class AuthController {
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
     	
-    	System.out.println("Registration : "+request);
         if (userRepository.existsByEmail(request.getEmail())) {
             return ResponseEntity.badRequest()
                 .body(Map.of("message", "Email is already registered"));
@@ -103,8 +94,7 @@ public class AuthController {
         user.setRole(User.Role.USER);
         
         userRepository.save(user);
-        
-        // Send welcome email
+       
         emailService.sendWelcomeEmail(user.getEmail(), user.getName());
         
         return ResponseEntity.ok(Map.of("message", "User registered successfully"));

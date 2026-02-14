@@ -1,8 +1,11 @@
 package com.showtime.controller;
 
 import com.showtime.dto.*;
+import com.showtime.repository.UserRepository;
 import com.showtime.service.*;
 import lombok.RequiredArgsConstructor;
+
+import org.springframework.data.repository.query.Param;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +27,7 @@ public class AdminController {
     private final TheaterService theaterService;
     private final ShowService showService;
     private final BookingService bookingService;
+    private final UserRepository userRepository;
     
     
     
@@ -36,7 +40,7 @@ public class AdminController {
         stats.setTotalUsers(userService.getTotalUsers());
         stats.setTotalRevenue(bookingService.getTotalRevenue());
         
-//        // Convert Object[] to RevenueChartDTO
+        // Convert Object[] to RevenueChartDTO
 //        List<RevenueChartDTO> revenueChart = bookingService.getMonthlyRevenue().stream()
 //            .map(data -> {
 //                RevenueChartDTO dto = new RevenueChartDTO();
@@ -54,6 +58,16 @@ public class AdminController {
     @GetMapping("/users")
     public ResponseEntity<List<UserDTO>> getAllUsers() {
         return ResponseEntity.ok(userService.getAllUsers());
+    }
+    
+    @DeleteMapping("users/{id}")
+    public ResponseEntity<String> deleteUser(@Param("id") Long id){
+    	 
+    	if(userRepository.existsById(id)) {
+    		userRepository.deleteById(id);
+    	}
+    	
+    	return ResponseEntity.ok("User deleted");
     }
     
     @PutMapping("/users/{id}/role")
@@ -101,22 +115,5 @@ public class AdminController {
         );
         return ResponseEntity.ok(report);
     }
-        
-    // SYSTEM ENDPOINTS
-    @GetMapping("/system/health")
-    public ResponseEntity<Map<String, Object>> getSystemHealth() {
-        Map<String, Object> health = Map.of(
-            "status", "UP",
-            "timestamp", LocalDateTime.now(),
-            "database", "CONNECTED",
-            "memoryUsage", Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory()
-        );
-        return ResponseEntity.ok(health);
-    }
-    
-    @PostMapping("/system/cache/clear")
-    public ResponseEntity<?> clearCache() {
-        // Implement cache clearing logic
-        return ResponseEntity.ok(Map.of("message", "Cache cleared successfully"));
-    }
+       
 }

@@ -27,11 +27,11 @@ import java.util.Map;
 @RequestMapping("/api/bookings")
 @RequiredArgsConstructor
 public class BookingController {
-    @Autowired
+//    @Autowired
     private final BookingService bookingService;
-    @Autowired
+//    @Autowired
     private final BookingRepository bookingRepository;
-    @Autowired
+//    @Autowired
     private final UserRepository userRepository;
     
     @PostMapping

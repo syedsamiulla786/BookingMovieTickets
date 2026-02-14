@@ -1,20 +1,20 @@
 package com.showtime.controller;
 
-import com.showtime.dto.*;
-
-
+import com.showtime.dto.MovieDTO;
+import com.showtime.dto.request.MovieFilterRequest;
+import com.showtime.dto.request.MovieRequest;
 import com.showtime.service.MovieService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import com.showtime.dto.request.*;
-import com.showtime.dto.response.*;
-import org.springframework.data.domain.Page;
 
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/movies")
 @RequiredArgsConstructor
@@ -39,11 +39,13 @@ public class MovieController {
     
     @GetMapping("/search")
     public ResponseEntity<List<MovieDTO>> searchMovies(@RequestParam String query) {
+        log.info("Search movies endpoint called with query: {}", query);
         return ResponseEntity.ok(movieService.searchMovies(query));
     }
     
     @PostMapping("/filter")
     public ResponseEntity<Page<MovieDTO>> filterMovies(@RequestBody MovieFilterRequest filter) {
+        log.info("Filter movies endpoint called with filters: {}", filter);
         return ResponseEntity.ok(movieService.filterMovies(filter));
     }
     

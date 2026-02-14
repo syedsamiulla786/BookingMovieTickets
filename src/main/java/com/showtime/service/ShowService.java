@@ -146,6 +146,9 @@ public class ShowService {
         // Get all seats for this show
         List<Seat> seats = seatRepository.findByShowId(showId);
         
+        System.out.println("SHow Id : "+showId);
+//        System.out.println("seats : "+seats);
+        
         // Create response
         SeatLayoutResponse response = new SeatLayoutResponse();
         response.setShowId(showId);

@@ -52,7 +52,7 @@ public interface BookingRepository extends JpaRepository<Booking, Long> {
            "AND b.paymentStatus = 'COMPLETED' " +
            "GROUP BY FUNCTION('DATE_FORMAT', b.bookedAt, '%Y-%m') " +
            "ORDER BY month")
-    List<Object[]> getMonthlyRevenue(@Param("startDate") LocalDateTime startDate);
+    List<Object[]> getMonthlyRevenue(@Param("startDate") LocalDateTime startDate); 
     
     // Find all bookings with pagination
     Page<Booking> findAll(Pageable pageable);

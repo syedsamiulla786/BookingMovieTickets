@@ -139,6 +139,7 @@ public class BookingService {
     
     // Get user bookings
     public List<BookingDTO> getUserBookings(String username) {
+    	System.out.println("User "+username);
         User user = userRepository.findByEmail(username)
             .orElseThrow(() -> new RuntimeException("User not found"));
         
